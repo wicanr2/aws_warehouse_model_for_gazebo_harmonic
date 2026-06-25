@@ -56,6 +56,7 @@ jobs:
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models"
           export LIBGL_ALWAYS_SOFTWARE=true
+          export GALLIUM_DRIVER=llvmpipe   # 用最快的軟體光柵器(非預設 swrast),渲染快又穩
           set -o pipefail
           # gz sim 會用 GZ_SIM_RESOURCE_PATH 解析 model://;能載入代表 include 都接得上
           xvfb-run -a gz sim -s -r --iterations 300 worlds/small_warehouse.sdf 2>&1 | tee load.log || true
@@ -94,15 +95,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gz-harmonic
 
-      - name: 診斷 GL/EGL 環境
+      - name: 診斷 GL/EGL 環境(確認切到 llvmpipe)
         run: |
-          echo "== glxinfo =="; glxinfo -B 2>&1 | head -8 || true
-          echo "== eglinfo =="; eglinfo 2>&1 | head -25 || true
+          export LIBGL_ALWAYS_SOFTWARE=true GALLIUM_DRIVER=llvmpipe
+          echo "== eglinfo surfaceless driver(應為 llvmpipe,不是 swrast)=="
+          eglinfo 2>&1 | grep -iA2 'Surfaceless platform' | grep -iE 'driver name|vendor|version' || true
+          echo "== EGL 渲染器(OpenGL renderer 應含 llvmpipe)=="
+          eglinfo 2>&1 | grep -iE 'OpenGL renderer|OpenGL core profile version' | head -4 || true
 
       - name: 渲染靜態成果圖(EGL surfaceless;軟體渲染慢,給足 wall-clock)
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
+          export GALLIUM_DRIVER=llvmpipe   # 用最快的軟體光柵器(非預設 swrast),渲染快又穩
           render_one () {  # $1=world $2=存檔dir $3=輸出png $4=最多輪詢次數(每次5s)
             rm -rf "$2" && mkdir -p "$2"
             gz sim -s -r -v 4 --headless-rendering "$1" > /tmp/g.log 2>&1 &
@@ -155,6 +160,7 @@ jobs:
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
+          export GALLIUM_DRIVER=llvmpipe   # 用最快的軟體光柵器(非預設 swrast),渲染快又穩
           rm -rf /tmp/frames && mkdir -p /tmp/frames
           # 背景跑(才能同時下指令);用 stdbuf 行緩衝避免 log 被吞,SIGINT 優雅停讓影格 flush
           stdbuf -oL -eL gz sim -s -r --headless-rendering worlds/forklift_video.sdf > video.log 2>&1 &
