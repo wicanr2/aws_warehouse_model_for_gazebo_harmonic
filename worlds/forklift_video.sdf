@@ -1,0 +1,74 @@
+<?xml version="1.0" ?>
+<!-- 叉車錄影世界:forklift_test + Sensors system + 一台俯視相機(連續存影格)。
+     CI 用 EGL headless 渲染,相機把影格存到 /tmp/frames,再 ffmpeg 合成 mp4。 -->
+<sdf version="1.10">
+  <world name="forklift_video">
+
+    <gravity>0 0 -9.8</gravity>
+    <physics name="default" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system"           name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"     name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <!-- 相機要出影格,必掛 Sensors system -->
+    <plugin filename="gz-sim-sensors-system"           name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <scene>
+      <ambient>0.5 0.5 0.5 1</ambient>
+      <background>0.7 0.8 0.9 1</background>
+      <shadows>true</shadows>
+    </scene>
+
+    <light name="sun" type="directional">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>0.3 0.3 -1</direction>
+      <cast_shadows>true</cast_shadows>
+    </light>
+
+    <model name="ground">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 俯視相機:看叉車從原點往 -X/-Y 走的那塊區域;save 連續存影格 -->
+    <model name="rec_cam">
+      <static>true</static>
+      <pose>-1.5 -1.5 10 0 1.5708 0</pose>
+      <link name="link">
+        <sensor name="cam" type="camera">
+          <camera>
+            <horizontal_fov>1.0</horizontal_fov>
+            <image><width>960</width><height>720</height></image>
+            <clip><near>0.1</near><far>60</far></clip>
+            <save enabled="true"><path>/tmp/frames</path></save>
+          </camera>
+          <always_on>1</always_on>
+          <update_rate>10</update_rate>
+          <topic>rec_cam</topic>
+        </sensor>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://forklift</uri>
+      <pose>0 0 0 0 0 0</pose>
+    </include>
+
+  </world>
+</sdf>

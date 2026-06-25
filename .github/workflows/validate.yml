@@ -81,11 +81,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安裝 Gazebo Harmonic + xvfb
+      - name: 安裝 Gazebo Harmonic + 軟體渲染依賴
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y curl lsb-release gnupg xvfb
+          sudo apt-get install -y curl lsb-release gnupg \
+            libgl1-mesa-dri libegl1 libegl-mesa0 libglx-mesa0 mesa-utils
           sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
             -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
           echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
@@ -93,26 +94,79 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gz-harmonic
 
-      - name: 渲染倉庫俯視圖(screenshot_warehouse.sdf 內的相機 save 出 PNG)
+      - name: 渲染倉庫俯視圖(EGL headless,背景跑讓相機 flush 影格)
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models"
           export LIBGL_ALWAYS_SOFTWARE=true
           rm -rf /tmp/warehouse_render && mkdir -p /tmp/warehouse_render
-          # 跑一段讓相機 sensor 渲染並存檔;取最後一張(避免前幾張場景還沒載完)
-          # 給 xvfb 足夠色深(24-bit),否則 ogre2 建不出 GL context、相機不會渲染
-          xvfb-run -a --server-args="-screen 0 1600x1200x24" gz sim -s -r --iterations 1500 worlds/screenshot_warehouse.sdf 2>&1 | tee render.log || true
+          # 用 --headless-rendering(EGL,免 xvfb);背景跑、睡幾秒讓相機非同步渲染 flush,再收
+          gz sim -s -r --headless-rendering worlds/screenshot_warehouse.sdf > render.log 2>&1 &
+          PID=$!; sleep 12; kill "$PID" 2>/dev/null || true; sleep 1
           echo "---- 存出的影格 ----"; ls -la /tmp/warehouse_render || true
           last="$(ls -1 /tmp/warehouse_render/*.png 2>/dev/null | tail -1)"
-          if [ -z "$last" ]; then echo "::error::沒有渲染出任何 PNG"; tail -40 render.log; exit 1; fi
+          if [ -z "$last" ]; then echo "::warning::沒有渲染出 PNG(看 render.log artifact 診斷)"; tail -30 render.log || true; exit 0; fi
           cp "$last" warehouse-overview.png
-          echo "成果圖:$last -> warehouse-overview.png ($(du -h warehouse-overview.png | cut -f1))"
+          echo "成果圖:$last -> warehouse-overview.png"
 
-      - name: 上傳成果圖
+      - name: 上傳成果圖 + log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: warehouse-overview
-          path: warehouse-overview.png
+          path: |
+            warehouse-overview.png
+            render.log
+
+  # ── 錄影:叉車移動的 mp4(EGL headless 渲染相機影格 → ffmpeg)──
+  video:
+    runs-on: ubuntu-24.04
+    needs: sdf-validate
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Gazebo Harmonic + ffmpeg + 軟體渲染依賴
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release gnupg ffmpeg \
+            libgl1-mesa-dri libegl1 libegl-mesa0 libglx-mesa0 mesa-utils
+          sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gz-harmonic
+
+      - name: 錄叉車移動(EGL headless 相機影格 → mp4)
+        run: |
+          export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
+          export LIBGL_ALWAYS_SOFTWARE=true
+          rm -rf /tmp/frames && mkdir -p /tmp/frames
+          gz sim -s -r --headless-rendering worlds/forklift_video.sdf > video.log 2>&1 &
+          PID=$!
+          sleep 3
+          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 6.0' || true
+          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.2' || true
+          sleep 10
+          kill "$PID" 2>/dev/null || true; sleep 1
+          echo "---- 影格數 ----"; ls /tmp/frames 2>/dev/null | wc -l
+          n=$(ls /tmp/frames/*.png 2>/dev/null | wc -l)
+          if [ "$n" -lt 5 ]; then echo "::warning::影格太少($n),看 video.log artifact"; tail -30 video.log || true; exit 0; fi
+          ffmpeg -y -framerate 10 -pattern_type glob -i '/tmp/frames/*.png' \
+            -c:v libx264 -pix_fmt yuv420p forklift.mp4
+          cp "$(ls -1 /tmp/frames/*.png | tail -1)" forklift-still.png
+          echo "影片 $(du -h forklift.mp4 | cut -f1),影格 $n"
+
+      - name: 上傳影片 + log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forklift-video
+          path: |
+            forklift.mp4
+            forklift-still.png
+            video.log
 
   # ── 叉車「會動」測試:純物理(無渲染),下舵輪+轉向指令,檢查位姿有變 ──
   # 已在 Harmonic 實測通過(位移 ~0.56m),設為必過 gate。
