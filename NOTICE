@@ -1,0 +1,13 @@
+本 repo 的倉庫模型(models/、worlds/)衍生自:
+
+  AWS RoboMaker Small Warehouse World
+  https://github.com/aws-robotics/aws-robomaker-small-warehouse-world
+
+原始作品著作權與授權歸 Amazon.com, Inc. 或其關係企業所有,授權條款以該
+repo 的 LICENSE 為準。本 repo 在 Phase 2 搬入模型時,會一併納入原始
+LICENSE 檔並於各模型保留出處標註;在此之前 models/ 為空,僅有占位說明。
+
+本 repo 自行新增的部分(遷移腳本、世界檔改寫、自搭差速搬運車 AMR、Docker、
+launch、設定)為本專案產出。
+
+遷移方法與技術出處見 MIGRATION.md。

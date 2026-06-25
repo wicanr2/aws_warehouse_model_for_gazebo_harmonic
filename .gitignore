@@ -1,0 +1,20 @@
+# ROS 2 / colcon
+build/
+install/
+log/
+
+# Gazebo / Fuel 快取
+.gz/
+.ignition/
+*.dae.bak
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 編輯器 / 系統
+.vscode/
+.idea/
+*.swp
+.DS_Store
