@@ -260,7 +260,7 @@
     <!-- 叉車 spawn 在走道開放處;純物理(無相機)→ 軌跡記錄不受渲染影響 -->
     <include>
       <uri>model://forklift</uri>
-      <pose>3 -1 0.05 0 0 0</pose>
+      <pose>3 -1 0.35 0 0 0</pose>
     </include>
 
   </world>
