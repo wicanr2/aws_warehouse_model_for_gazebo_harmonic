@@ -83,7 +83,8 @@ gz topic -t /forklift/fork     -m gz.msgs.Double -p 'data: 0.3'   # 叉子高度
   bash scripts/validate.sh
   ```
   檢查所有 `model.sdf`(`gz sdf -k`,含 14 倉庫模型 + 叉車)、worlds XML 良構、每個 `model://` 都對應得到 `models/` 或 `robot/` 下的目錄。
-- **GitHub Actions**([`.github/workflows/validate.yml`](.github/workflows/validate.yml)):在 Gazebo Harmonic 上跑靜態驗證、`gz sim` headless 真正載入 world(唯一能解析 `model://`),以及 `forklift-move`(載入叉車、下指令、確認位姿有變=真的會動)。
+- **GitHub Actions**([`.github/workflows/validate.yml`](.github/workflows/validate.yml)):在 Gazebo Harmonic 上跑靜態驗證、`gz sim` headless 真正載入 world(唯一能解析 `model://`),以及 `forklift-move`(載入叉車、下指令、確認位姿有變=真的會動)。這幾項**不需 render**,在免費 runner 上 100% 可靠。
+- `render` / `video` job(成果圖、錄影)**需要 render**:免費 runner 無 GPU、純軟體渲染(EGL + `GALLIUM_DRIVER=llvmpipe`)又慢又間歇,設為 `continue-on-error`(不擋 CI)、屬 best-effort。穩定出圖要 GPU runner / 帶 GL 的 Docker / 本機一次性截圖。技術細節與雷見 [robot-notes 教學 §7](https://github.com/wicanr2/robot-notes/blob/main/docs/50-physical-ai/simulation-gazebo-ros2.md)。
 
 驗證細節與一路抓到的真 bug(physics type 必填、慣性違反三角不等式、XML 註解 `--`…)見 [MIGRATION.md](MIGRATION.md)。
 
