@@ -115,11 +115,10 @@ jobs:
           path: warehouse-overview.png
 
   # ── 叉車「會動」測試:純物理(無渲染),下舵輪+轉向指令,檢查位姿有變 ──
-  # 先 continue-on-error(未實測過 gz topic 行為);綠了再考慮升必過。
+  # 已在 Harmonic 實測通過(位移 ~0.56m),設為必過 gate。
   forklift-move:
     runs-on: ubuntu-24.04
     needs: sdf-validate
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
