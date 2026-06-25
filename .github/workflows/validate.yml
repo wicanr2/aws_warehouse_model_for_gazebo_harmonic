@@ -99,17 +99,19 @@ jobs:
           echo "== glxinfo =="; glxinfo -B 2>&1 | head -8 || true
           echo "== eglinfo =="; eglinfo 2>&1 | head -25 || true
 
-      - name: 渲染倉庫俯視圖(EGL,真實時間跑夠久 + SIGINT 優雅停)
+      - name: 診斷 — 前景正常退出,看相機到底有沒有存檔
         run: |
-          export GZ_SIM_RESOURCE_PATH="$PWD/models"
+          export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
-          rm -rf /tmp/warehouse_render && mkdir -p /tmp/warehouse_render
-          # 前景、真實時間跑 ~22s 讓相機 render thread 渲染並存檔,timeout 用 SIGINT 優雅關閉(會 flush)
-          timeout --signal=INT 22 gz sim -s -r --headless-rendering worlds/screenshot_warehouse.sdf > render.log 2>&1 || true
-          sleep 1
-          echo "== 影格 =="; ls -la /tmp/warehouse_render || true
-          last="$(ls -1 /tmp/warehouse_render/*.png 2>/dev/null | tail -1)"
-          if [ -n "$last" ]; then cp "$last" warehouse-overview.png; echo "成果圖 OK: $last"; else echo "::warning::仍無 PNG"; tail -25 render.log || true; fi
+          rm -rf /tmp/frames && mkdir -p /tmp/frames
+          # 前景、--iterations 正常退出(會 flush log);用簡單的 forklift_video 場景(boxes,軟體渲染快)
+          gz sim -s -r --headless-rendering --iterations 6000 worlds/forklift_video.sdf > render.log 2>&1 || true
+          echo "== 影格數 =="; ls /tmp/frames/*.png 2>/dev/null | wc -l; ls /tmp/frames 2>/dev/null | head
+          echo "== render.log 行數 =="; wc -l render.log || true
+          echo "== save/render 活動 =="; grep -iE 'save|\.png|saving|frame|update.*rate|camera' render.log | head -15 || true
+          echo "== render.log 尾 25 =="; tail -25 render.log || true
+          last="$(ls -1 /tmp/frames/*.png 2>/dev/null | tail -1)"
+          if [ -n "$last" ]; then cp "$last" warehouse-overview.png; echo "存到圖了: $last"; else echo "::warning::仍無影格"; fi
 
       - name: 上傳成果圖 + log
         if: always()
