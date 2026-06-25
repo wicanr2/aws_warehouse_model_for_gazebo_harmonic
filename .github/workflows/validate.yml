@@ -73,9 +73,11 @@ jobs:
           path: load.log
 
   # ── 成果圖:headless 渲染倉庫俯視圖,輸出成 artifact(供教學文使用)──
+  # 軟體渲染在 CI 上較不穩,先設 continue-on-error 不擋整體;成功就有圖。
   render:
     runs-on: ubuntu-24.04
     needs: sdf-validate
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 
@@ -97,7 +99,8 @@ jobs:
           export LIBGL_ALWAYS_SOFTWARE=true
           rm -rf /tmp/warehouse_render && mkdir -p /tmp/warehouse_render
           # 跑一段讓相機 sensor 渲染並存檔;取最後一張(避免前幾張場景還沒載完)
-          xvfb-run -a gz sim -s -r --iterations 1500 worlds/screenshot_warehouse.sdf 2>&1 | tee render.log || true
+          # 給 xvfb 足夠色深(24-bit),否則 ogre2 建不出 GL context、相機不會渲染
+          xvfb-run -a --server-args="-screen 0 1600x1200x24" gz sim -s -r --iterations 1500 worlds/screenshot_warehouse.sdf 2>&1 | tee render.log || true
           echo "---- 存出的影格 ----"; ls -la /tmp/warehouse_render || true
           last="$(ls -1 /tmp/warehouse_render/*.png 2>/dev/null | tail -1)"
           if [ -z "$last" ]; then echo "::error::沒有渲染出任何 PNG"; tail -40 render.log; exit 1; fi
