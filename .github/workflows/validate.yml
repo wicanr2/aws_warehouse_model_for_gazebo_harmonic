@@ -265,10 +265,10 @@ jobs:
           # 背景記錄叉車位姿
           gz topic -e -t /model/forklift/pose > poses.txt 2>&1 &
           LOGPID=$!
-          # 舵輪驅動 + 緩轉,讓它在走道走出一段弧線
-          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 5.0' || true
-          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.15' || true
-          sleep 18
+          # 舵輪驅動(單舵輪效率低,轉速給大)+ 緩轉,讓它在走道走出明顯弧線
+          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 22.0' || true
+          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.12' || true
+          sleep 25
           kill "$LOGPID" 2>/dev/null || true
           kill -INT "$PID" 2>/dev/null || true; sleep 2; pkill -9 -f 'gz sim' 2>/dev/null || true
           echo "位姿樣本數 = $(grep -c 'name: \"forklift\"' poses.txt || echo 0)"
