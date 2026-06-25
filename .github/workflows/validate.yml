@@ -103,19 +103,22 @@ jobs:
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
-          render_one () {  # $1=world $2=存檔dir $3=輸出png $4=等待秒數
+          render_one () {  # $1=world $2=存檔dir $3=輸出png $4=最多輪詢次數(每次5s)
             rm -rf "$2" && mkdir -p "$2"
-            gz sim -s -r --headless-rendering "$1" > /tmp/g.log 2>&1 &
-            local PID=$!
-            sleep "$4"
-            echo "[$1] ${4}s 內影格數 = $(ls "$2"/*.png 2>/dev/null | wc -l)"
+            gz sim -s -r -v 4 --headless-rendering "$1" > /tmp/g.log 2>&1 &
+            local PID=$! i
+            # 輪詢:出圖就停(對飄忽的軟體渲染時間穩健)
+            for i in $(seq 1 "$4"); do
+              sleep 5
+              if ls "$2"/*.png >/dev/null 2>&1; then echo "[$1] 約 $((i*5))s 出圖"; sleep 2; break; fi
+            done
             kill -INT "$PID" 2>/dev/null || true; sleep 2
             local f; f="$(ls -1 "$2"/*.png 2>/dev/null | tail -1)"
-            if [ -n "$f" ]; then cp "$f" "$3"; echo "✅ $3 <- $f ($(du -h "$3"|cut -f1))"; else echo "::warning::$1 無影格"; fi
+            if [ -n "$f" ]; then cp "$f" "$3"; echo "✅ $3 <- $f ($(du -h "$3"|cut -f1))"; else echo "::warning::$1 無影格(看 /tmp/g.log)"; tail -15 /tmp/g.log||true; fi
           }
-          # 叉車場景(boxes,快):~26s;倉庫場景(14 個貼圖模型,慢):~70s
-          render_one worlds/forklift_video.sdf      /tmp/frames           forklift-overview.png   26
-          render_one worlds/screenshot_warehouse.sdf /tmp/warehouse_render warehouse-overview.png  72
+          # 輪詢上限:叉車最多 ~60s、倉庫最多 ~150s
+          render_one worlds/forklift_video.sdf      /tmp/frames           forklift-overview.png   12
+          render_one worlds/screenshot_warehouse.sdf /tmp/warehouse_render warehouse-overview.png  30
           echo "== 產出 =="; ls -la *.png 2>/dev/null || echo "(無)"
 
       - name: 上傳成果圖
