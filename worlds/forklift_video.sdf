@@ -49,7 +49,7 @@
     <!-- 俯視相機:看叉車從原點往 -X/-Y 走的那塊區域;save 連續存影格 -->
     <model name="rec_cam">
       <static>true</static>
-      <pose>0 0 4.5 0 1.5708 0</pose>
+      <pose>0 0 8 0 1.5708 0</pose>
       <link name="link">
         <sensor name="cam" type="camera">
           <camera>

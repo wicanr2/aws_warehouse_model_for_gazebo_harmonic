@@ -108,22 +108,22 @@ jobs:
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
           export GALLIUM_DRIVER=llvmpipe   # 用最快的軟體光柵器(非預設 swrast),渲染快又穩
-          render_one () {  # $1=world $2=存檔dir $3=輸出png $4=最多輪詢次數(每次5s)
-            rm -rf "$2" && mkdir -p "$2"
-            gz sim -s -r -v 4 --headless-rendering "$1" > /tmp/g.log 2>&1 &
-            local PID=$! i
-            # 輪詢:出圖就停(對飄忽的軟體渲染時間穩健)
-            for i in $(seq 1 "$4"); do
-              sleep 5
-              if ls "$2"/*.png >/dev/null 2>&1; then echo "[$1] 約 $((i*5))s 出圖"; sleep 2; break; fi
+          render_one () {  # $1=world $2=存檔dir $3=輸出png;軟體渲染間歇 → 重試 3 次
+            local attempt PID f
+            for attempt in 1 2 3; do
+              rm -rf "$2" && mkdir -p "$2"
+              gz sim -s -r -v 4 --headless-rendering "$1" > /tmp/g.log 2>&1 &
+              PID=$!
+              sleep 35   # 給足軟體渲染暖機(首張最久)
+              kill -INT "$PID" 2>/dev/null || true; sleep 2; pkill -9 -f 'gz sim' 2>/dev/null || true; sleep 1
+              f="$(ls -1 "$2"/*.png 2>/dev/null | tail -1)"
+              if [ -n "$f" ]; then cp "$f" "$3"; echo "✅ $3(第 $attempt 次)<- $f ($(du -h "$3"|cut -f1))"; return 0; fi
+              echo "[$1] 第 $attempt 次無影格,重試;g.log 尾:"; tail -6 /tmp/g.log || true
             done
-            kill -INT "$PID" 2>/dev/null || true; sleep 2
-            local f; f="$(ls -1 "$2"/*.png 2>/dev/null | tail -1)"
-            if [ -n "$f" ]; then cp "$f" "$3"; echo "✅ $3 <- $f ($(du -h "$3"|cut -f1))"; else echo "::warning::$1 無影格(看 /tmp/g.log)"; tail -15 /tmp/g.log||true; fi
+            echo "::warning::$1 三次都無影格"
           }
-          # 輪詢上限:叉車最多 ~60s、倉庫最多 ~150s
-          render_one worlds/forklift_video.sdf      /tmp/frames           forklift-overview.png   12
-          render_one worlds/screenshot_warehouse.sdf /tmp/warehouse_render warehouse-overview.png  30
+          render_one worlds/forklift_video.sdf       /tmp/frames           forklift-overview.png
+          render_one worlds/screenshot_warehouse.sdf /tmp/warehouse_render warehouse-overview.png
           echo "== 產出 =="; ls -la *.png 2>/dev/null || echo "(無)"
 
       - name: 上傳成果圖
