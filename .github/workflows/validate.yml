@@ -99,31 +99,33 @@ jobs:
           echo "== glxinfo =="; glxinfo -B 2>&1 | head -8 || true
           echo "== eglinfo =="; eglinfo 2>&1 | head -25 || true
 
-      - name: 診斷 — gz 活著時就看磁碟有沒有影格(-v4,背景真實時間)
+      - name: 渲染靜態成果圖(EGL surfaceless;軟體渲染慢,給足 wall-clock)
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
-          rm -rf /tmp/frames && mkdir -p /tmp/frames
-          gz sim -s -r -v 4 --headless-rendering worlds/forklift_video.sdf > render.log 2>&1 &
-          PID=$!
-          sleep 18
-          echo "== gz 還活著時的影格數 =="; ls /tmp/frames/*.png 2>/dev/null | wc -l; ls /tmp/frames 2>/dev/null | head
-          echo "== 相機 topic =="; gz topic -l 2>/dev/null | grep -i cam || echo "(無 cam topic)"
-          echo "== 訂閱相機看有沒有發佈影像 =="; timeout 5 gz topic -e -t /rec_cam -n 1 2>&1 | head -5 || echo "(收不到影像)"
-          kill -INT "$PID" 2>/dev/null || true; sleep 3
-          echo "== 結束後影格數 =="; ls /tmp/frames/*.png 2>/dev/null | wc -l
-          echo "== log: render/camera/egl/save =="; grep -iE 'camera|save|render|sensor|advertis|\.png|EGL|ogre|engine|Creat' render.log | head -25 || true
-          last="$(ls -1 /tmp/frames/*.png 2>/dev/null | tail -1)"
-          if [ -n "$last" ]; then cp "$last" warehouse-overview.png; echo "存到圖了: $last"; else echo "::warning::仍無影格"; fi
+          render_one () {  # $1=world $2=存檔dir $3=輸出png $4=等待秒數
+            rm -rf "$2" && mkdir -p "$2"
+            gz sim -s -r --headless-rendering "$1" > /tmp/g.log 2>&1 &
+            local PID=$!
+            sleep "$4"
+            echo "[$1] ${4}s 內影格數 = $(ls "$2"/*.png 2>/dev/null | wc -l)"
+            kill -INT "$PID" 2>/dev/null || true; sleep 2
+            local f; f="$(ls -1 "$2"/*.png 2>/dev/null | tail -1)"
+            if [ -n "$f" ]; then cp "$f" "$3"; echo "✅ $3 <- $f ($(du -h "$3"|cut -f1))"; else echo "::warning::$1 無影格"; fi
+          }
+          # 叉車場景(boxes,快):~26s;倉庫場景(14 個貼圖模型,慢):~70s
+          render_one worlds/forklift_video.sdf      /tmp/frames           forklift-overview.png   26
+          render_one worlds/screenshot_warehouse.sdf /tmp/warehouse_render warehouse-overview.png  72
+          echo "== 產出 =="; ls -la *.png 2>/dev/null || echo "(無)"
 
-      - name: 上傳成果圖 + log
+      - name: 上傳成果圖
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: warehouse-overview
+          name: overview-stills
           path: |
             warehouse-overview.png
-            render.log
+            forklift-overview.png
 
   # ── 錄影:叉車移動的 mp4(EGL headless 渲染相機影格 → ffmpeg)──
   video:
