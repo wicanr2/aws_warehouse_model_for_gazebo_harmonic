@@ -66,6 +66,14 @@ gz topic -t /forklift/fork     -m gz.msgs.Double -p 'data: 0.3'   # 叉子高度
 
 先方塊車身求「會動」;`worlds/forklift_test.sdf` 是測試平地。CI 的 `forklift-move` job 會 headless 載入、下指令、比對前後位姿確認真的有移動。外觀之後可換 Fuel OpenRobotics/Forklift mesh,運動學換成 ros2_control 的 `tricycle_controller`(進 ROS 2 階段)。
 
+CI 在 Harmonic 上 headless 渲染出的方塊叉車(EGL 軟體渲染;構圖陽春,但證明渲染管線可行):
+
+<p align="center"><img src="docs/forklift-ci-render.png" width="360" alt="CI headless 渲染的舵輪叉車俯視圖"></p>
+
+### Phase 3.1 叉車在倉庫裡行走(`forklift-in-warehouse` job)
+
+把叉車 spawn 進 AWS 倉庫(`worlds/forklift_in_warehouse.sdf`)、驅動它,**記錄位姿軌跡畫成俯視路徑圖**——純物理、不需 GPU/render,所以**無 GPU 也能在 CI「看到」叉車在倉庫走**。產出 `forklift-warehouse-path.png`(artifact)。要 3D 畫面才需要 render(免費 runner 不穩,見下方驗證說明)。
+
 ### Phase 2 已遷移內容
 
 - `models/`：14 個 AWS 倉庫模型(貨架/牆/地板/雜物/棧板車…),含 `meshes/*.DAE` 與貼圖,**原封搬入**;每個 `model.sdf` / `model.config` 的 SDF 版本 1.6 → 1.10。

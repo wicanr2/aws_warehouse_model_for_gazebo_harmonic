@@ -234,3 +234,53 @@ jobs:
             sim.log
             pose_before.txt
             pose_after.txt
+
+  # ── 叉車在 AWS 倉庫裡「行走」:純物理(無渲染),記位姿 → 畫俯視軌跡圖 ──
+  # 無 GPU 也能看到叉車在倉庫走:用 matplotlib 畫路徑(不靠 render),100% 可靠。
+  forklift-in-warehouse:
+    runs-on: ubuntu-24.04
+    needs: sdf-validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Gazebo Harmonic + matplotlib
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release gnupg python3-matplotlib
+          sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gz-harmonic
+
+      - name: 驅動叉車、記錄位姿、畫倉庫俯視軌跡
+        run: |
+          export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
+          # 純物理(world 無相機),背景跑
+          gz sim -s -r worlds/forklift_in_warehouse.sdf > sim.log 2>&1 &
+          PID=$!
+          sleep 5
+          # 背景記錄叉車位姿
+          gz topic -e -t /model/forklift/pose > poses.txt 2>&1 &
+          LOGPID=$!
+          # 舵輪驅動 + 緩轉,讓它在走道走出一段弧線
+          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 5.0' || true
+          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.15' || true
+          sleep 18
+          kill "$LOGPID" 2>/dev/null || true
+          kill -INT "$PID" 2>/dev/null || true; sleep 2; pkill -9 -f 'gz sim' 2>/dev/null || true
+          echo "位姿樣本數 = $(grep -c 'name: \"forklift\"' poses.txt || echo 0)"
+          python3 scripts/plot_trajectory.py poses.txt worlds/forklift_in_warehouse.sdf forklift-warehouse-path.png
+          ls -la forklift-warehouse-path.png
+
+      - name: 上傳軌跡圖
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forklift-warehouse-path
+          path: |
+            forklift-warehouse-path.png
+            poses.txt
+            sim.log
