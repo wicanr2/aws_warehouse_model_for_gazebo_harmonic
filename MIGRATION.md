@@ -56,6 +56,23 @@
 
 ---
 
+## 實際遷移結果(Phase 2 執行紀錄)
+
+clone AWS repo 後逐檔檢視,實況比預期輕:
+
+| 項目 | 預期 | 實況 |
+|---|---|---|
+| 模型 plugin | 可能要拆 `libgazebo_ros_*` | **14 個模型全部 plugin=0**,無需拆 |
+| 材質 | 可能要把 `<material><script>` 轉 PBR | **全部無 material script**,材質靠 `.DAE` 自帶貼圖 → 不需改 |
+| world plugin | 倉庫 world 幾乎無 plugin | 確認:**world 完全沒有 Classic plugin**,只有 include + 一盞 point light + physics |
+| 靜態 | — | 14 個模型皆 `<static>1`,利於 SLAM(不會被撞動) |
+| mesh | 通用 | Collada `.DAE`(visual + collision 各一),原封沿用 |
+
+**實際動到的**:
+1. 28 個 `model.sdf` / `model.config`:`sdf version` 1.6 → 1.10(含一個用單引號 `version='1.6'` 的 Bucket_01)。
+2. 2 個 world(`small_warehouse`、`no_roof_small_warehouse`):升版、清 `frame=""`/`frame=''`、physics 去 `type="ode"`、補 4 個 world 系統 plugin + `<scene>`。
+3. 30 個 XML 檔全數通過良構檢查;**尚未在 gz sim 實機載入**。
+
 ## 待查證 / 待實機校正(不寫死)
 
 - world 層 `gz-sim-sensors-system` 的精確 filename/name(依命名規律推得)。
