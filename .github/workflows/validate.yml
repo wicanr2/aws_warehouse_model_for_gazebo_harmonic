@@ -34,10 +34,9 @@ jobs:
         run: bash scripts/validate.sh
 
   # ── 第二道關:headless 真正載入 world(唯一能解析 model:// 的方式)──
-  # 先設 continue-on-error 當資訊性;在 GitHub 上跑穩定後,可移除這行改為必過。
+  # 已在 Harmonic 上實測通過(model:// 全解析、無致命錯),設為必過 gate。
   headless-load:
     runs-on: ubuntu-24.04
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
 

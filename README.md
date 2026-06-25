@@ -48,7 +48,7 @@ AWS 官方的 [aws-robomaker-small-warehouse-world](https://github.com/aws-robot
 |---|---|---|
 | 1 | Scaffold:目錄、README、遷移清單 | ✅ 完成 |
 | 2 | **AWS warehouse 機械遷移**(搬 14 models + 2 worlds) | ✅ 完成 |
-| 2b | 驗證:`validate.sh` + GitHub Actions(Harmonic) | ✅ 靜態驗證綠;headless 載入待 CI 首跑 |
+| 2b | 驗證:`validate.sh` + GitHub Actions(Harmonic) | ✅ CI 全綠(靜態驗證 + `gz sim` headless 真載入都過) |
 | 1b | Docker 基底(Jazzy + ros-jazzy-ros-gz + slam_toolbox) | ⏸ 晚點實作 |
 | 3 | 自搭差速搬運車 AMR(gz diff-drive + gpu_lidar) | ⬜ 待做 |
 | 4 | 串接 launch(world + spawn + bridge),驗 topics/tf | ⬜ 待做 |
