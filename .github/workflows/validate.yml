@@ -99,17 +99,20 @@ jobs:
           echo "== glxinfo =="; glxinfo -B 2>&1 | head -8 || true
           echo "== eglinfo =="; eglinfo 2>&1 | head -25 || true
 
-      - name: 診斷 — 前景正常退出,看相機到底有沒有存檔
+      - name: 診斷 — gz 活著時就看磁碟有沒有影格(-v4,背景真實時間)
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
           export LIBGL_ALWAYS_SOFTWARE=true
           rm -rf /tmp/frames && mkdir -p /tmp/frames
-          # 前景、--iterations 正常退出(會 flush log);用簡單的 forklift_video 場景(boxes,軟體渲染快)
-          gz sim -s -r --headless-rendering --iterations 6000 worlds/forklift_video.sdf > render.log 2>&1 || true
-          echo "== 影格數 =="; ls /tmp/frames/*.png 2>/dev/null | wc -l; ls /tmp/frames 2>/dev/null | head
-          echo "== render.log 行數 =="; wc -l render.log || true
-          echo "== save/render 活動 =="; grep -iE 'save|\.png|saving|frame|update.*rate|camera' render.log | head -15 || true
-          echo "== render.log 尾 25 =="; tail -25 render.log || true
+          gz sim -s -r -v 4 --headless-rendering worlds/forklift_video.sdf > render.log 2>&1 &
+          PID=$!
+          sleep 18
+          echo "== gz 還活著時的影格數 =="; ls /tmp/frames/*.png 2>/dev/null | wc -l; ls /tmp/frames 2>/dev/null | head
+          echo "== 相機 topic =="; gz topic -l 2>/dev/null | grep -i cam || echo "(無 cam topic)"
+          echo "== 訂閱相機看有沒有發佈影像 =="; timeout 5 gz topic -e -t /rec_cam -n 1 2>&1 | head -5 || echo "(收不到影像)"
+          kill -INT "$PID" 2>/dev/null || true; sleep 3
+          echo "== 結束後影格數 =="; ls /tmp/frames/*.png 2>/dev/null | wc -l
+          echo "== log: render/camera/egl/save =="; grep -iE 'camera|save|render|sensor|advertis|\.png|EGL|ogre|engine|Creat' render.log | head -25 || true
           last="$(ls -1 /tmp/frames/*.png 2>/dev/null | tail -1)"
           if [ -n "$last" ]; then cp "$last" warehouse-overview.png; echo "存到圖了: $last"; else echo "::warning::仍無影格"; fi
 
