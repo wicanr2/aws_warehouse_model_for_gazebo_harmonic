@@ -118,7 +118,40 @@
       </visual>
     </link>
 
+    <!-- ===== 2D LiDAR(SLAM 用,gpu_lidar 360°)===== -->
+    <link name="lidar_link">
+      <pose>0.4 0 0.78 0 0 0</pose>
+      <inertial>
+        <mass>0.3</mass>
+        <inertia><ixx>0.0005</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.0005</iyy><iyz>0</iyz><izz>0.0005</izz></inertia>
+      </inertial>
+      <visual name="visual">
+        <geometry><cylinder><radius>0.05</radius><length>0.06</length></cylinder></geometry>
+        <material><ambient>0.1 0.3 0.8 1</ambient><diffuse>0.1 0.3 0.8 1</diffuse></material>
+      </visual>
+      <sensor name="lidar" type="gpu_lidar">
+        <topic>scan</topic>
+        <gz_frame_id>lidar_link</gz_frame_id>
+        <update_rate>10</update_rate>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>360</samples><resolution>1</resolution>
+              <min_angle>-3.14159</min_angle><max_angle>3.14159</max_angle>
+            </horizontal>
+          </scan>
+          <range><min>0.2</min><max>12.0</max><resolution>0.01</resolution></range>
+        </lidar>
+        <always_on>1</always_on>
+        <visualize>true</visualize>
+      </sensor>
+    </link>
+
     <!-- ===== 關節 ===== -->
+    <!-- LiDAR 固定在車身 -->
+    <joint name="lidar_joint" type="fixed">
+      <parent>base_link</parent><child>lidar_link</child>
+    </joint>
     <!-- 轉向:base → steer_link,繞 Z -->
     <joint name="steering_joint" type="revolute">
       <parent>base_link</parent><child>steer_link</child>
@@ -145,6 +178,13 @@
     </joint>
 
     <!-- ===== gz 原生控制 plugin(純 Gazebo,不需 ROS 2)===== -->
+    <!-- 里程計:發布 odom 與 odom→base_link tf(SLAM 需要)。此為模擬里程,
+         實機由輪速/編碼器估算;gpu_lidar 出 /scan 還需 world 掛 Sensors system。 -->
+    <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
+      <odom_frame>odom</odom_frame>
+      <robot_base_frame>base_link</robot_base_frame>
+      <dimensions>2</dimensions>
+    </plugin>
     <!-- 舵輪驅動:速度命令(gz.msgs.Double, rad/s)-->
     <plugin filename="gz-sim-joint-controller-system" name="gz::sim::systems::JointController">
       <joint_name>traction_joint</joint_name>
