@@ -36,10 +36,10 @@ AWS 官方的 [aws-robomaker-small-warehouse-world](https://github.com/aws-robot
 ├── docker/              # Dockerfile / 執行腳本(Jazzy + Harmonic;晚點實作)
 ├── worlds/              # 遷移後的世界檔 small_warehouse.sdf
 ├── models/              # ★ 從 AWS repo 搬來、路徑/SDF/材質已遷移的倉庫模型
-├── robot/carrier_amr/   # 自搭差速搬運車(車體+2驅動輪+caster+2D LiDAR)
+├── robot/forklift/      # ★ 舵輪驅動叉車(tricycle,方塊車身)+ gz 原生控制 plugin
 ├── launch/              # warehouse / spawn / slam / bringup launch
 ├── config/              # ros_gz_bridge、slam_toolbox、RViz 設定
-└── scripts/             # teleop / 繞圈腳本
+└── scripts/             # validate.sh、check_moved.py 等
 ```
 
 ## 進度
@@ -49,10 +49,22 @@ AWS 官方的 [aws-robomaker-small-warehouse-world](https://github.com/aws-robot
 | 1 | Scaffold:目錄、README、遷移清單 | ✅ 完成 |
 | 2 | **AWS warehouse 機械遷移**(搬 14 models + 2 worlds) | ✅ 完成 |
 | 2b | 驗證:`validate.sh` + GitHub Actions(Harmonic) | ✅ CI 全綠(靜態驗證 + `gz sim` headless 真載入都過) |
+| 3 | **舵輪叉車(純 gz 能動)**:tricycle 結構 + gz plugin + 會動測試 | ✅ 模型完成,CI 驗「會動」 |
 | 1b | Docker 基底(Jazzy + ros-jazzy-ros-gz + slam_toolbox) | ⏸ 晚點實作 |
-| 3 | 自搭差速搬運車 AMR(gz diff-drive + gpu_lidar) | ⬜ 待做 |
-| 4 | 串接 launch(world + spawn + bridge),驗 topics/tf | ⬜ 待做 |
+| 4 | 串接 launch / ros2_control(換 ROS 2)、spawn 進倉庫 | ⬜ 待做 |
 | 5 | slam_toolbox + 繞圈 + 截圖 | ⬜ 待做(實跑) |
+
+### Phase 3 舵輪叉車(robot/forklift/)
+
+reach-truck 構型:**一顆可轉向+驅動的舵輪(後)+ 兩顆從動承載輪(前,叉子端)+ 可升降叉子**。用 **gz 原生 plugin**(JointController / JointPositionController),**純 Gazebo 即可驅動,不需 ROS 2**:
+
+```bash
+gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 8.0'   # 舵輪轉速 rad/s
+gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.4'   # 舵角 rad
+gz topic -t /forklift/fork     -m gz.msgs.Double -p 'data: 0.3'   # 叉子高度 m
+```
+
+先方塊車身求「會動」;`worlds/forklift_test.sdf` 是測試平地。CI 的 `forklift-move` job 會 headless 載入、下指令、比對前後位姿確認真的有移動。外觀之後可換 Fuel OpenRobotics/Forklift mesh,運動學換成 ros2_control 的 `tricycle_controller`(進 ROS 2 階段)。
 
 ### Phase 2 已遷移內容
 
@@ -70,8 +82,8 @@ AWS 官方的 [aws-robomaker-small-warehouse-world](https://github.com/aws-robot
   ```bash
   bash scripts/validate.sh
   ```
-  檢查 14 個 `model.sdf`(`gz sdf -k`)、2 個 world XML 良構、每個 `model://` 都對應得到 `models/<name>/`。
-- **GitHub Actions**([`.github/workflows/validate.yml`](.github/workflows/validate.yml)):在 Gazebo Harmonic 上跑上面的靜態驗證,再用 `gz sim` headless 真正載入 world(唯一能解析 `model://` 的方式)。
+  檢查所有 `model.sdf`(`gz sdf -k`,含 14 倉庫模型 + 叉車)、worlds XML 良構、每個 `model://` 都對應得到 `models/` 或 `robot/` 下的目錄。
+- **GitHub Actions**([`.github/workflows/validate.yml`](.github/workflows/validate.yml)):在 Gazebo Harmonic 上跑靜態驗證、`gz sim` headless 真正載入 world(唯一能解析 `model://`),以及 `forklift-move`(載入叉車、下指令、確認位姿有變=真的會動)。
 
 驗證細節與一路抓到的真 bug(physics type 必填、慣性違反三角不等式、XML 註解 `--`…)見 [MIGRATION.md](MIGRATION.md)。
 

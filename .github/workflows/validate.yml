@@ -113,3 +113,50 @@ jobs:
         with:
           name: warehouse-overview
           path: warehouse-overview.png
+
+  # ── 叉車「會動」測試:純物理(無渲染),下舵輪+轉向指令,檢查位姿有變 ──
+  # 先 continue-on-error(未實測過 gz topic 行為);綠了再考慮升必過。
+  forklift-move:
+    runs-on: ubuntu-24.04
+    needs: sdf-validate
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Gazebo Harmonic
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release gnupg
+          sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gz-harmonic
+
+      - name: 載入叉車、下指令、比對位姿
+        run: |
+          export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
+          # server-only、即時跑(無感測器→不需渲染),背景執行
+          gz sim -s -r worlds/forklift_test.sdf > sim.log 2>&1 &
+          SIMPID=$!
+          sleep 4
+          echo "=== 起始位姿 ==="; gz topic -e -t /model/forklift/pose -n 1 | tee pose_before.txt || true
+          # 舵輪驅動(rad/s)+ 轉向(rad)
+          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 8.0' || true
+          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.25' || true
+          sleep 7
+          echo "=== 結束位姿 ==="; gz topic -e -t /model/forklift/pose -n 1 | tee pose_after.txt || true
+          kill "$SIMPID" 2>/dev/null || true
+          python3 scripts/check_moved.py pose_before.txt pose_after.txt
+
+      - name: 保留 log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forklift-move-logs
+          path: |
+            sim.log
+            pose_before.txt
+            pose_after.txt

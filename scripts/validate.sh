@@ -15,11 +15,12 @@
 
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export GZ_SIM_RESOURCE_PATH="${ROOT}/models"
+export GZ_SIM_RESOURCE_PATH="${ROOT}/models:${ROOT}/robot"
 fail=0
 
 echo "== 1) model.sdf(gz sdf -k)=="
-for m in "${ROOT}"/models/*/model.sdf; do
+for m in "${ROOT}"/models/*/model.sdf "${ROOT}"/robot/*/model.sdf; do
+  [ -f "$m" ] || continue
   name="$(basename "$(dirname "$m")")"
   out="$(gz sdf -k "$m" 2>&1)"
   if echo "$out" | grep -qE 'Error Code'; then
@@ -40,8 +41,8 @@ for w in "${ROOT}"/worlds/*.sdf; do
     echo "  ✗ ${wname}(XML 壞)"; sed 's/^/      /' /tmp/xmlerr; fail=1
   fi
   for n in $(grep -ohE 'model://[A-Za-z0-9_]+' "$w" | sort -u | sed 's|model://||'); do
-    if [ ! -d "${ROOT}/models/${n}" ]; then
-      echo "  ✗ ${wname} 引用 model://${n},但缺 models/${n}/"; fail=1
+    if [ ! -d "${ROOT}/models/${n}" ] && [ ! -d "${ROOT}/robot/${n}" ]; then
+      echo "  ✗ ${wname} 引用 model://${n},但 models/ 與 robot/ 都找不到"; fail=1
     fi
   done
 done
