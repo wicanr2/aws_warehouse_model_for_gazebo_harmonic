@@ -71,3 +71,42 @@ jobs:
         with:
           name: load-log
           path: load.log
+
+  # ── 成果圖:headless 渲染倉庫俯視圖,輸出成 artifact(供教學文使用)──
+  render:
+    runs-on: ubuntu-24.04
+    needs: sdf-validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Gazebo Harmonic + xvfb
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release gnupg xvfb
+          sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gz-harmonic
+
+      - name: 渲染倉庫俯視圖(screenshot_warehouse.sdf 內的相機 save 出 PNG)
+        run: |
+          export GZ_SIM_RESOURCE_PATH="$PWD/models"
+          export LIBGL_ALWAYS_SOFTWARE=true
+          rm -rf /tmp/warehouse_render && mkdir -p /tmp/warehouse_render
+          # 跑一段讓相機 sensor 渲染並存檔;取最後一張(避免前幾張場景還沒載完)
+          xvfb-run -a gz sim -s -r --iterations 1500 worlds/screenshot_warehouse.sdf 2>&1 | tee render.log || true
+          echo "---- 存出的影格 ----"; ls -la /tmp/warehouse_render || true
+          last="$(ls -1 /tmp/warehouse_render/*.png 2>/dev/null | tail -1)"
+          if [ -z "$last" ]; then echo "::error::沒有渲染出任何 PNG"; tail -40 render.log; exit 1; fi
+          cp "$last" warehouse-overview.png
+          echo "成果圖:$last -> warehouse-overview.png ($(du -h warehouse-overview.png | cut -f1))"
+
+      - name: 上傳成果圖
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: warehouse-overview
+          path: warehouse-overview.png
