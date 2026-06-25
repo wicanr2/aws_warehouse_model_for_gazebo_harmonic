@@ -4,14 +4,16 @@
     <link name="link">
       <inertial>
         <mass>1000</mass>
-        <pose frame=''>0 0 0 0 0 0</pose>
+        <pose>0 0 0 0 0 0</pose>
         <inertia>
+          <!-- izz 原為 1302083.333,違反三角不等式(ixx+iyy<izz);static 裝飾模型,
+               改成合法值(<ixx+iyy)以通過 sdformat 驗證,不影響模擬 -->
           <ixx>834024.533</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
           <iyy>459441.200</iyy>
           <iyz>0</iyz>
-          <izz>1302083.333</izz>
+          <izz>1293000.000</izz>
         </inertia>
       </inertial>
       <collision name="collision">

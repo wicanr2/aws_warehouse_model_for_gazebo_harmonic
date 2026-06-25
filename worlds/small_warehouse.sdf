@@ -3,14 +3,15 @@
   <world name="default">
     
     <gravity>0 0 -9.8</gravity>
-    <physics default="0" name="default_physics">
+    <!-- physics 的 type 為 SDFormat 必填屬性,保留原 ode 字串即可;gz sim 實際引擎
+         由 gz-sim-physics-system 預設(dartsim)決定,不看此字串(要換引擎走 gz sim 的 physics-engine 旗標) -->
+    <physics default="0" name="default_physics" type="ode">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>
     </physics>
 
     <!-- ▼ Harmonic 遷移新增:world 層系統 plugin(Classic 內建,gz sim 要手掛) -->
-    <!-- 移除引擎 type(原 ode):未指定則用 Harmonic 預設 dartsim,避免缺 ode plugin 載入失敗 -->
     <plugin filename="gz-sim-physics-system"           name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-user-commands-system"     name="gz::sim::systems::UserCommands"/>
     <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>

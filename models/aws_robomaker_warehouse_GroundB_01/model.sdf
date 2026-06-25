@@ -5,10 +5,12 @@
       <inertial>
         <mass>1000</mass>
 		<inertia>
+          <!-- iyy 原為 8333416.66,違反慣性張量三角不等式(ixx+izz<iyy);此為 static
+               裝飾模型,慣性不影響模擬,改成合法值(=izz)以通過 sdformat 驗證 -->
           <ixx>1200083.33</ixx>
           <ixy>0</ixy>
           <ixz>0</ixz>
-          <iyy>8333416.66</iyy>
+          <iyy>2033333.33</iyy>
           <iyz>0</iyz>
           <izz>2033333.33</izz>
         </inertia>

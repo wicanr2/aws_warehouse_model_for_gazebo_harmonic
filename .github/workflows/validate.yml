@@ -1,0 +1,74 @@
+name: validate
+
+# 在 GitHub 的機器上用 Gazebo Harmonic 驗證遷移後的模型/世界,
+# 本機(尤其 CPU 吃緊時)不必自己跑。
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ── 第一道關:輕量靜態驗證(快、穩、不需渲染)──
+  sdf-validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Gazebo Harmonic
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release gnupg
+          sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gz-harmonic
+
+      - name: 版本
+        run: gz sim --version
+
+      - name: SDF 靜態驗證(scripts/validate.sh)
+        run: bash scripts/validate.sh
+
+  # ── 第二道關:headless 真正載入 world(唯一能解析 model:// 的方式)──
+  # 先設 continue-on-error 當資訊性;在 GitHub 上跑穩定後,可移除這行改為必過。
+  headless-load:
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安裝 Gazebo Harmonic + xvfb
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y curl lsb-release gnupg xvfb
+          sudo curl -fsSL https://packages.osrfoundation.org/gazebo.gpg \
+            -o /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gz-harmonic
+
+      - name: headless 載入 small_warehouse(server-only,跑 300 步後退出)
+        run: |
+          export GZ_SIM_RESOURCE_PATH="$PWD/models"
+          export LIBGL_ALWAYS_SOFTWARE=true
+          set -o pipefail
+          # gz sim 會用 GZ_SIM_RESOURCE_PATH 解析 model://;能載入代表 include 都接得上
+          xvfb-run -a gz sim -s -r --iterations 300 worlds/small_warehouse.sdf 2>&1 | tee load.log || true
+          echo "---- 檢查 log 是否有致命錯 ----"
+          if grep -E 'Unable to find uri|Error Code|Failed to load' load.log; then
+            echo "::error::world headless 載入有錯(見上)"; exit 1
+          fi
+          echo "✅ headless 載入無致命錯"
+
+      - name: 保留 log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-log
+          path: load.log

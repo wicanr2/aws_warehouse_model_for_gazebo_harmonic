@@ -47,7 +47,8 @@ AWS 官方的 [aws-robomaker-small-warehouse-world](https://github.com/aws-robot
 | Phase | 內容 | 狀態 |
 |---|---|---|
 | 1 | Scaffold:目錄、README、遷移清單 | ✅ 完成 |
-| 2 | **AWS warehouse 機械遷移**(搬 14 models + 2 worlds) | ✅ 檔案完成(待實跑驗證) |
+| 2 | **AWS warehouse 機械遷移**(搬 14 models + 2 worlds) | ✅ 完成 |
+| 2b | 驗證:`validate.sh` + GitHub Actions(Harmonic) | ✅ 靜態驗證綠;headless 載入待 CI 首跑 |
 | 1b | Docker 基底(Jazzy + ros-jazzy-ros-gz + slam_toolbox) | ⏸ 晚點實作 |
 | 3 | 自搭差速搬運車 AMR(gz diff-drive + gpu_lidar) | ⬜ 待做 |
 | 4 | 串接 launch(world + spawn + bridge),驗 topics/tf | ⬜ 待做 |
@@ -60,6 +61,19 @@ AWS 官方的 [aws-robomaker-small-warehouse-world](https://github.com/aws-robot
 - 意外輕鬆:14 個模型**全部 `plugin=0`、無 `<material><script>`、全 `<static>`**,材質靠 DAE 自帶貼圖 → 模型層只需升版,不需改材質或拆 plugin。
 - 全 30 個 XML 檔通過良構檢查。**尚未在 gz sim 實際載入**(Docker 未建),材質顯示、Sensors plugin 名等待實跑校正。
 - 來源授權:AWS 原始 LICENSE(MIT)存於 `models/LICENSE.aws`,出處見 [NOTICE](NOTICE)。
+
+## 驗證
+
+不確定模型/世界改對了沒,跑驗證即可(本機 CPU 吃緊就交給 GitHub Actions,push 後自動跑):
+
+- 本機輕量檢查(只解析、不跑物理/渲染):
+  ```bash
+  bash scripts/validate.sh
+  ```
+  檢查 14 個 `model.sdf`(`gz sdf -k`)、2 個 world XML 良構、每個 `model://` 都對應得到 `models/<name>/`。
+- **GitHub Actions**([`.github/workflows/validate.yml`](.github/workflows/validate.yml)):在 Gazebo Harmonic 上跑上面的靜態驗證,再用 `gz sim` headless 真正載入 world(唯一能解析 `model://` 的方式)。
+
+驗證細節與一路抓到的真 bug(physics type 必填、慣性違反三角不等式、XML 註解 `--`…)見 [MIGRATION.md](MIGRATION.md)。
 
 ## 怎麼跑
 

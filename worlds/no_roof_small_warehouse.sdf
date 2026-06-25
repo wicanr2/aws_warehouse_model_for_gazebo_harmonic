@@ -3,7 +3,9 @@
   <world name="default">
     
     <gravity>0 0 -9.8</gravity>
-    <physics default="0" name="default_physics">
+    <!-- physics 的 type 為 SDFormat 必填屬性,保留原 ode 字串即可;gz sim 實際引擎
+         由 gz-sim-physics-system 預設(dartsim)決定,不看此字串(要換引擎走 gz sim 的 physics-engine 旗標) -->
+    <physics default="0" name="default_physics" type="ode">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1</real_time_factor>
       <real_time_update_rate>1000</real_time_update_rate>

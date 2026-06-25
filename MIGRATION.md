@@ -73,6 +73,23 @@ clone AWS repo 後逐檔檢視,實況比預期輕:
 2. 2 個 world(`small_warehouse`、`no_roof_small_warehouse`):升版、清 `frame=""`/`frame=''`、physics 去 `type="ode"`、補 4 個 world 系統 plugin + `<scene>`。
 3. 30 個 XML 檔全數通過良構檢查;**尚未在 gz sim 實機載入**。
 
+## 驗證(本機 + GitHub Actions)
+
+遷移後分兩層把關(你本機 CPU 吃緊,主力交給 CI):
+
+- **輕量靜態驗證** [`scripts/validate.sh`](scripts/validate.sh)(只解析、不跑物理/渲染,CPU 吃很少):14 個 `model.sdf` 過 `gz sdf -k`、2 個 world XML 良構、world 裡每個 `model://` 都對應得到 `models/<name>/`。
+- **headless 真載入** [`.github/workflows/validate.yml`](.github/workflows/validate.yml) 在 GitHub 的 Harmonic 上跑 `gz sim -s -r --iterations 300`——**唯一能真正解析 `model://`、載入整個 world 的方式**。
+
+> 為什麼不能只用 `gz sdf -p` 驗 world:`model://` 是 gz-sim 執行期 + `GZ_SIM_RESOURCE_PATH` 的功能,獨立 sdformat 工具沒註冊 findFile callback(會報 "callback is empty"),include 解析只能交給 `gz sim`。
+
+**驗證過程抓到的真 bug(都已修)**:
+1. `<physics>` 的 `type` 是 SDFormat **必填屬性**——一開始把 `type="ode"` 整個拿掉,導致 world 驗證 Error 4;改回保留字串(實際引擎由 `gz-sim-physics-system` 預設 dartsim 決定)。
+2. `GroundB`、`RoofB` 的慣性張量**違反三角不等式**(AWS 原始資料就錯),新版 sdformat 報 Error 19;兩者皆 static,改成合法值、不影響模擬。
+3. XML 註解內不可有 `--`(雙連字號):我寫的註解含 `--physics-engine`,被嚴格 XML 解析器(expat)拒(tinyxml2 容忍但不可攜),已改寫。
+4. `frame=""` pose 屬性(Bucket/RoofB)在新 sdformat 是 warning,一併清掉。
+
+> 心得:`gz sdf` 與嚴格 XML 解析器(expat)各抓到不同問題,兩個一起用才完整。這也是「先在本機跑驗證、再寫 CI」的價值——CI 腳本本身的盲點先在本機補掉。
+
 ## 待查證 / 待實機校正(不寫死)
 
 - world 層 `gz-sim-sensors-system` 的精確 filename/name(依命名規律推得)。
