@@ -258,20 +258,21 @@ jobs:
       - name: 驅動叉車、記錄位姿、畫倉庫俯視軌跡
         run: |
           export GZ_SIM_RESOURCE_PATH="$PWD/models:$PWD/robot"
-          # 純物理(world 無相機),背景跑
-          gz sim -s -r worlds/forklift_in_warehouse.sdf > sim.log 2>&1 &
+          # 在輕量世界開(dartsim 忽略倉庫 mesh 碰撞 → 物理等價,但 sim 快得多、跑得遠),
+          # 路徑再疊到倉庫佈局圖上。背景跑。
+          gz sim -s -r worlds/forklift_drive.sdf > sim.log 2>&1 &
           PID=$!
-          sleep 7   # 讓叉車從高處落下、在倉庫地板穩定著地
-          # 背景記錄叉車位姿
+          sleep 4
           gz topic -e -t /model/forklift/pose > poses.txt 2>&1 &
           LOGPID=$!
-          # 舵輪驅動(單舵輪效率低,轉速給大)+ 直線(steer≈0),沿走道開出明顯直線
-          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 25.0' || true
-          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.05' || true
-          sleep 55
+          # 舵輪驅動 + 緩轉,沿走道開出一段弧線
+          gz topic -t /forklift/traction -m gz.msgs.Double -p 'data: 8.0' || true
+          gz topic -t /forklift/steer    -m gz.msgs.Double -p 'data: 0.18' || true
+          sleep 30
           kill "$LOGPID" 2>/dev/null || true
           kill -INT "$PID" 2>/dev/null || true; sleep 2; pkill -9 -f 'gz sim' 2>/dev/null || true
           echo "位姿樣本數 = $(grep -c 'name: \"forklift\"' poses.txt || echo 0)"
+          # 障礙佈局取自倉庫世界,路徑取自輕量世界(物理等價)
           python3 scripts/plot_trajectory.py poses.txt worlds/forklift_in_warehouse.sdf forklift-warehouse-path.png
           ls -la forklift-warehouse-path.png
 

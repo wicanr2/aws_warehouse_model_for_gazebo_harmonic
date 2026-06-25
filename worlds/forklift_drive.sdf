@@ -1,0 +1,32 @@
+<?xml version="1.0" ?>
+<!-- 輕量驅動世界:只有地板 + 叉車,sim 跑得快,叉車能開出好幾米的路徑。
+     重點:dartsim 忽略倉庫 mesh 碰撞,所以叉車「在倉庫裡開」跟「在這片空地上開」
+     物理完全等價;這裡把它開好,再把路徑疊到倉庫佈局圖上(plot_trajectory.py)。
+     叉車起點 (3,-1) 對齊倉庫走道。 -->
+<sdf version="1.10">
+  <world name="forklift_drive">
+    <gravity>0 0 -9.8</gravity>
+    <physics name="default" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+    </physics>
+    <plugin filename="gz-sim-physics-system"           name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"     name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+
+    <model name="floor">
+      <static>true</static>
+      <link name="link">
+        <collision name="c">
+          <geometry><plane><normal>0 0 1</normal><size>80 80</size></plane></geometry>
+          <surface><friction><ode><mu>1.0</mu><mu2>1.0</mu2></ode></friction></surface>
+        </collision>
+      </link>
+    </model>
+
+    <include>
+      <uri>model://forklift</uri>
+      <pose>3 -1 0.2 0 0 0</pose>
+    </include>
+  </world>
+</sdf>
