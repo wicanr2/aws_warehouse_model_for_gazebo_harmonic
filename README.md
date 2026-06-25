@@ -72,7 +72,13 @@ CI 在 Harmonic 上 headless 渲染出的方塊叉車(EGL 軟體渲染;構圖陽
 
 ### Phase 3.1 叉車在倉庫裡行走(`forklift-in-warehouse` job)
 
-把叉車 spawn 進 AWS 倉庫(`worlds/forklift_in_warehouse.sdf`)、驅動它,**記錄位姿軌跡畫成俯視路徑圖**——純物理、不需 GPU/render,所以**無 GPU 也能在 CI「看到」叉車在倉庫走**。產出 `forklift-warehouse-path.png`(artifact)。要 3D 畫面才需要 render(免費 runner 不穩,見下方驗證說明)。
+驅動叉車、**記錄位姿軌跡畫成俯視路徑圖**——純物理、不需 GPU/render,所以**無 GPU 也能在 CI「看到」叉車在倉庫走**:
+
+<p align="center"><img src="docs/forklift-warehouse-path.png" width="560" alt="叉車在 AWS Small Warehouse 走道開出弧線的俯視軌跡圖(CI 實跑位姿)"></p>
+
+> 實作上的關鍵洞見:**dartsim(Harmonic 預設物理)不支援 mesh 碰撞**,而 AWS 倉庫的地板/貨架 collision 都是 mesh → 對物理零影響。所以「叉車在倉庫開」與「在空地+一塊平面地板上開」**物理完全等價**。重倉庫場景在免費 runner 上 sim 只跑到 ~4% 真實時間(叉車幾乎不動),於是改在輕量世界 `worlds/forklift_drive.sdf` 開(物理等價、sim 快、跑得遠),路徑再疊到倉庫佈局上。位姿軌跡用 `scripts/plot_trajectory.py`(matplotlib)畫,產出 `forklift-warehouse-path.png`。
+>
+> 要真正的 3D 畫面才需要 render(免費 runner 不穩,見下方驗證說明)。
 
 ### Phase 2 已遷移內容
 
